@@ -29,6 +29,7 @@ import io.github.farrfreezy.karoosmartlock.core.TempMode
 import io.github.farrfreezy.karoosmartlock.core.ThresholdTrigger
 import io.github.farrfreezy.karoosmartlock.core.UnlockMode
 import io.github.farrfreezy.karoosmartlock.data.SettingsRepository
+import io.github.farrfreezy.karoosmartlock.sim.SimulatorClient
 import io.hammerhead.karooext.models.UserProfile
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
@@ -44,6 +45,7 @@ fun SettingsScreen(
     profile: UserProfile?,
     onRequestOverlayPermission: () -> Unit,
     onPreviewLock: () -> Unit,
+    simulator: SimulatorClient? = null,
 ) {
     val settings by repository.settingsFlow.collectAsStateWithLifecycle(SmartLockSettings())
     val scope = rememberCoroutineScope()
@@ -68,6 +70,11 @@ fun SettingsScreen(
                     onRequestOverlayPermission = onRequestOverlayPermission,
                     onPreviewLock = onPreviewLock,
                 )
+            }
+
+            simulator?.let {
+                item { SectionHeader("Development") }
+                item { SimulatorPanel(simulator = it) }
             }
 
             item { SectionHeader("Ride start") }
@@ -224,6 +231,12 @@ private fun StatusCard(
                 text = if (karooConnected) "Karoo system: connected" else "Karoo system: not connected",
                 style = MaterialTheme.typography.bodyMedium,
             )
+            if (!karooConnected && BuildConfig.DEBUG) {
+                Text(
+                    "Expected off-device — use the simulator below.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
             OutlinedButton(onClick = onPreviewLock, enabled = overlayGranted) {
                 Text("Preview lock (10 s)")
             }
