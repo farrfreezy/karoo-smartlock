@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">SmartLock</string>
+    <string name="extension_name">SmartLock</string>
+    <string name="action_toggle_lock">Toggle screen lock</string>
+    <string name="unlock_hint">Hold lock to unlock</string>
+    <string name="reason_auto">Auto-locked</string>
+    <string name="reason_rain">Rain</string>
+    <string name="reason_hr">Heart rate</string>
+    <string name="reason_cadence">Cadence</string>
+    <string name="reason_power">Power</string>
+    <string name="reason_temperature">Temperature</string>
+    <string name="reason_manual">Manual</string>
+</resources>

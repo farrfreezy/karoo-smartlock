@@ -1,0 +1,58 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build release APK
+        run: ./gradlew assembleRelease
+        env:
+          GPR_USER: ${{ github.actor }}
+          GPR_KEY: ${{ secrets.GITHUB_TOKEN }}
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+
+      - name: Prepare release assets
+        run: |
+          cp app/build/outputs/apk/release/app-release.apk app-release.apk
+          VERSION="${GITHUB_REF_NAME#v}"
+          VERSION_CODE=$(grep -oP 'versionCode = \K\d+' app/build.gradle.kts)
+          cat > manifest.json <<EOF
+          {
+            "label": "SmartLock",
+            "packageName": "io.github.farrfreezy.karoosmartlock",
+            "latestApkUrl": "https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/app-release.apk",
+            "latestVersion": "${VERSION}",
+            "latestVersionCode": ${VERSION_CODE},
+            "developer": "farrfreezy",
+            "description": "Automatically locks the Karoo touchscreen based on configurable ride triggers"
+          }
+          EOF
+          cat manifest.json
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            app-release.apk
+            manifest.json
+          generate_release_notes: true
