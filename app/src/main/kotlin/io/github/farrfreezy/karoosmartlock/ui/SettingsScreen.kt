@@ -35,6 +35,7 @@ import io.hammerhead.karooext.models.UserProfile
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
+private const val MAX_RAIN_LEAD_SEC = 3600
 private const val METERS_PER_MILE = 1609.344
 private const val IMPERIAL_DISTANCE_STEP_M = METERS_PER_MILE / 10.0
 
@@ -192,6 +193,54 @@ fun SettingsScreen(
             }
             if (settings.rainEnabled) {
                 item { RainSourceCard(settings = settings, update = update) }
+                item {
+                    TriggerCardStatic(
+                        title = "Lock before rain arrives",
+                        subtitle = if (settings.rainLeadSec == 0) {
+                            "Locks only once it is raining on you"
+                        } else {
+                            "Uses your route to see what you are riding into"
+                        },
+                        valueText = if (settings.rainLeadSec == 0) {
+                            "Off"
+                        } else {
+                            formatSeconds(settings.rainLeadSec.toDouble())
+                        },
+                        onStep = { dir ->
+                            update {
+                                it.copy(
+                                    rainLeadSec = (it.rainLeadSec + dir * 300)
+                                        .coerceIn(0, MAX_RAIN_LEAD_SEC),
+                                )
+                            }
+                        },
+                    )
+                }
+                item {
+                    SwitchCard(
+                        title = "Lock the whole ride if rain is likely",
+                        subtitle = "Decided once from the forecast along your route",
+                        checked = settings.rainWholeRideEnabled,
+                        onToggle = { on -> update { it.copy(rainWholeRideEnabled = on) } },
+                    )
+                }
+                if (settings.rainWholeRideEnabled) {
+                    item {
+                        TriggerCardStatic(
+                            title = "Chance of rain to lock the ride",
+                            subtitle = "Highest chance forecast anywhere you are heading",
+                            valueText = "${settings.rainWholeRideProbabilityPct}%",
+                            onStep = { dir ->
+                                update {
+                                    it.copy(
+                                        rainWholeRideProbabilityPct =
+                                        (it.rainWholeRideProbabilityPct + dir * 5).coerceIn(5, 100),
+                                    )
+                                }
+                            },
+                        )
+                    }
+                }
             }
 
             item { SectionHeader("Unlock behavior") }
@@ -377,6 +426,25 @@ private fun androidx.compose.foundation.layout.RowScope.ModeChip(
         Button(onClick = onClick, modifier = Modifier.weight(1f)) { Text(label) }
     } else {
         OutlinedButton(onClick = onClick, modifier = Modifier.weight(1f)) { Text(label) }
+    }
+}
+
+/** A card with a stepper but no on/off switch — the value itself carries the state. */
+@Composable
+private fun TriggerCardStatic(
+    title: String,
+    subtitle: String? = null,
+    valueText: String,
+    onStep: (Int) -> Unit,
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column {
+                Text(title, style = MaterialTheme.typography.bodyLarge)
+                subtitle?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+            }
+            Stepper(valueText = valueText, onStep = onStep)
+        }
     }
 }
 

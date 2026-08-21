@@ -15,11 +15,14 @@ import io.github.farrfreezy.karoosmartlock.karoo.singleValueOrNull
 import io.github.farrfreezy.karoosmartlock.karoo.streamDataFlow
 import io.github.farrfreezy.karoosmartlock.karoo.streamLocation
 import io.github.farrfreezy.karoosmartlock.karoo.streamRideState
+import io.github.farrfreezy.karoosmartlock.karoo.streamRoute
+import io.github.farrfreezy.karoosmartlock.karoo.streamSpeed
 import io.github.farrfreezy.karoosmartlock.karoo.toRide
 import io.github.farrfreezy.karoosmartlock.overlay.LockOverlayManager
 import io.github.farrfreezy.karoosmartlock.sim.SimulatorBridge
 import io.github.farrfreezy.karoosmartlock.weather.HeadwindRainSource
 import io.github.farrfreezy.karoosmartlock.weather.OpenMeteoRainSource
+import io.github.farrfreezy.karoosmartlock.weather.RainPolicy
 import io.github.farrfreezy.karoosmartlock.weather.RainSource
 import io.hammerhead.karooext.KarooSystemService
 import io.hammerhead.karooext.extension.KarooExtension
@@ -181,9 +184,25 @@ class KarooSmartLockExtension : KarooExtension("karoo-smartlock", BuildConfig.VE
     }
 
     private fun rainSource(source: RainDataSource): RainSource = when (source) {
-        RainDataSource.OPEN_METEO -> OpenMeteoRainSource(karoo, karoo.streamLocation())
+        RainDataSource.OPEN_METEO -> OpenMeteoRainSource(
+            karoo = karoo,
+            locations = karoo.streamLocation(),
+            routes = karoo.streamRoute(),
+            speeds = karoo.streamSpeed(),
+            // Live, so changing the lead or the whole-ride threshold mid-ride applies
+            // without tearing down the poller and losing the cached forecast.
+            policies = settingsRepository.settingsFlow
+                .map { it.rainPolicy() }
+                .distinctUntilChanged(),
+        )
         RainDataSource.HEADWIND -> HeadwindRainSource(karoo)
     }
+
+    private fun SmartLockSettings.rainPolicy(): RainPolicy = RainPolicy(
+        leadMs = rainLeadSec * 1_000L,
+        wholeRideEnabled = rainWholeRideEnabled,
+        wholeRideProbabilityPct = rainWholeRideProbabilityPct,
+    )
 
     private fun neededSensors(settings: SmartLockSettings): Set<Sensor> = buildSet {
         if (settings.distanceAfterStartM.enabled || settings.distanceAfterResumeM.enabled) {

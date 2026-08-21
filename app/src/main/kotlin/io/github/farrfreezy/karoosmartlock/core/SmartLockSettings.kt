@@ -43,6 +43,18 @@ data class SmartLockSettings(
     // Condition triggers over live sensor values
     val rainEnabled: Boolean = false,
     val rainSource: RainDataSource = RainDataSource.OPEN_METEO,
+    /**
+     * Lock this many seconds before rain is forecast to reach you, so the screen is
+     * already locked as the first drops land. 0 locks only once it is actually raining.
+     */
+    val rainLeadSec: Int = 0,
+    /**
+     * Lock for the whole ride when the chance of rain anywhere along the loaded route
+     * reaches [rainWholeRideProbabilityPct]. Falls back to the forecast at your
+     * position when no route is loaded.
+     */
+    val rainWholeRideEnabled: Boolean = false,
+    val rainWholeRideProbabilityPct: Int = 65,
     val hrAboveBpm: ThresholdTrigger = ThresholdTrigger(value = 160.0),
     val cadenceAboveRpm: ThresholdTrigger = ThresholdTrigger(value = 90.0),
     val powerAboveW: ThresholdTrigger = ThresholdTrigger(value = 250.0),

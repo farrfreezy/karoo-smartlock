@@ -13,10 +13,11 @@ normally stream.
 | Settings UI, layout at Karoo screen size | yes | yes |
 | Overlay: touch swallowing, hold-to-unlock, reason label | yes | yes |
 | Lock state machine (all triggers, debounce, auto-unlock) | yes, via simulator | yes |
-| Unit tests for `LockReducer` and `OpenMeteoRain` | yes (`./gradlew testDebugUnitTest`) | n/a |
+| Unit tests for the reducer, forecast and route geometry | yes (`./gradlew testDebugUnitTest`) | n/a |
 | `KarooSystemService` connection, real ride/sensor streams | no | yes |
 | Hardware buttons / bonus action binding | simulated only | yes |
 | Rain lookups (Open-Meteo over HTTP, or headwind's stream) | simulated only | yes |
+| Route-aware forecasting (loaded route, distance along it) | no | yes |
 | Rendering under the actual Karoo launcher | no | yes |
 
 The state machine, the overlay, and the settings plumbing are the parts that carry the
@@ -126,8 +127,13 @@ background, open SmartLock on the emulator first.
   stream (`TYPE_EXT::karoo-headwind::precipitation`) — so the simulator's rain buttons
   inject the decoded `RainStatus` instead, which is the only input the reducer sees
   anyway. Because no fix ever arrives, the Open-Meteo poller stays silent and will not
-  overwrite what you inject. The request URL and the response classification are pure
-  Kotlin and covered by `OpenMeteoRainTest`.
+  overwrite what you inject.
+- **Routes.** `OnNavigationState` and `DISTANCE_TO_DESTINATION` only exist on the real
+  system, so lead-time and whole-ride locking cannot be exercised end to end here. The
+  parts that carry the logic are pure Kotlin and covered by tests: polyline decoding and
+  distance-along-route in `RoutePathTest`, and forecast lookup, lead-time look-ahead and
+  route probability in `RainForecastTest` — plus request/response handling in
+  `OpenMeteoRainTest`.
 
 Sanity-check on the bike before shipping — but the emulator loop is where the trigger
 logic should be debugged.

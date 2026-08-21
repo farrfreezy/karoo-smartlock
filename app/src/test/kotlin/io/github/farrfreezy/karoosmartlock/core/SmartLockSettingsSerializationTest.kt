@@ -18,6 +18,9 @@ class SmartLockSettingsSerializationTest {
             timeAfterStartSec = ThresholdTrigger(true, 90.0),
             rainEnabled = true,
             rainSource = RainDataSource.HEADWIND,
+            rainLeadSec = 900,
+            rainWholeRideEnabled = true,
+            rainWholeRideProbabilityPct = 70,
             tempMode = TempMode.OUTSIDE_RANGE,
             unlockMode = UnlockMode.MANUAL_ONLY,
         )
