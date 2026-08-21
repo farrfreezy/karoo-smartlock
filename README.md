@@ -38,9 +38,22 @@ manual unlock, or ride end.
 
 The rain trigger asks Open-Meteo for the weather at your position and locks on any
 measurable precipitation, or on a WMO weather code that means drizzle, rain, snow,
-showers, or thunderstorms. It prefers the 15-minute resolution `minutely_15` data
-where the underlying model provides it and falls back to `current`, whose
-precipitation figure is the preceding hour's total.
+showers, or thunderstorms. It prefers the `minutely_15` bucket covering right now and
+falls back to `current`, whose precipitation figure is the preceding hour's total.
+
+Requests use Open-Meteo's `best_match` model selection, which picks the
+highest-resolution forecast available for wherever you are and blends it with global
+models — the **Met Office UKV at 2 km** in the UK and Ireland, ICON-D2 in Central
+Europe, AROME in France, HRRR in North America, and ~10 km global models elsewhere.
+That is already Open-Meteo's default; SmartLock sends it explicitly so a future change
+to that default can't quietly downgrade you. It is also the only setting that keeps
+working when you ride out of a regional model's coverage — pinning the Met Office model
+by name would simply stop returning data at its boundary.
+
+One caveat on resolution: only Central Europe and North America have models producing
+genuine 15-minute output. Elsewhere, the UK included, those buckets are derived from
+hourly values, so treat a UK reading as hourly data that tracks the hour ahead rather
+than the hour behind — not as 15 minutes of real resolution.
 
 Requests go over karoo-ext's HTTP bridge, which uses wifi when connected and
 otherwise Bluetooth to the Hammerhead Companion app — so **rain detection needs your

@@ -39,6 +39,23 @@ data class LatLon(val lat: Double, val lon: Double) {
  * Data is from [open-meteo.com](https://open-meteo.com) (CC BY 4.0). The free
  * API needs no key and allows non-commercial use under generous rate limits; a
  * ride polls it a handful of times per hour.
+ *
+ * ### Which forecast model a rider gets
+ *
+ * [MODELS] pins Open-Meteo's `best_match`, which picks the highest-resolution
+ * model available for the coordinates and blends it with global models. In the
+ * UK and Ireland that mix ends in the Met Office UKV at 2 km; Central Europe
+ * gets ICON-D2, France AROME, North America HRRR, and everywhere else falls back
+ * to ~10 km global models. It is also the only choice that degrades gracefully
+ * when a rider leaves a regional model's coverage mid-ride — pinning a specific
+ * regional model would simply stop returning data at its boundary.
+ *
+ * `best_match` is already the default for this endpoint, so sending it changes
+ * nothing today; it is explicit so that a future change to that default cannot
+ * silently downgrade riders to a coarser model.
+ *
+ * Grid cells are picked on land by default, which is what a road rider wants near
+ * a coast, so `cell_selection` is left alone.
  */
 object OpenMeteoRain {
 
@@ -46,6 +63,9 @@ object OpenMeteoRain {
 
     /** Strictly-greater-than comparison, so any measurable precipitation counts. */
     const val RAIN_THRESHOLD_MM = 0.0
+
+    /** Open-Meteo's seamless best-model-per-location selection. See the class docs. */
+    const val MODELS = "best_match"
 
     /** Each `minutely_15` entry covers the 15 minutes starting at its timestamp. */
     const val MINUTELY_BUCKET_SEC = 15 * 60L
@@ -64,16 +84,24 @@ object OpenMeteoRain {
         "&longitude=" + String.format(Locale.US, "%.4f", fix.lon) +
         "&current=precipitation,weather_code" +
         "&minutely_15=precipitation,weather_code" +
+        "&models=" + MODELS +
         "&forecast_days=1" +
         "&timeformat=unixtime"
 
     /**
      * Classify a forecast response into a [RainStatus].
      *
-     * Prefers the `minutely_15` bucket covering [nowMs] — 15-minute resolution
-     * where the underlying model provides it — and falls back to `current`,
-     * whose precipitation is the *preceding hour's* total and therefore lags
-     * both the start and the end of a shower.
+     * Prefers the `minutely_15` bucket covering [nowMs] and falls back to
+     * `current`, whose precipitation is the *preceding hour's* total and
+     * therefore lags both the start and the end of a shower.
+     *
+     * Only Central Europe and North America have models that produce genuine
+     * 15-minute output; everywhere else — the UK included — Open-Meteo derives
+     * those buckets from hourly values. That still beats `current` (it tracks the
+     * hour ahead rather than the hour behind) and it classifies consistently,
+     * because precipitation is disaggregated as a sum and `weather_code` is
+     * derived from a rate, not interpolated as a category. Just don't read a UK
+     * reading as 15 minutes of real resolution.
      *
      * Anything unparseable, absent, or too old yields [RainStatus.Unknown], which
      * leaves the rain trigger inert rather than guessing "dry".

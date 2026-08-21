@@ -30,6 +30,14 @@ class OpenMeteoRainTest {
         }
     }
 
+    @Test
+    fun `url pins the best-match model so a default change cannot downgrade riders`() {
+        // best_match is what gets a London rider the Met Office UKV at 2 km rather
+        // than a ~10 km global model.
+        val url = OpenMeteoRain.requestUrl(LatLon(51.5074, -0.1278))
+        assertTrue(url, url.contains("models=best_match"))
+    }
+
     // --- minutely_15 preferred ---
 
     @Test
