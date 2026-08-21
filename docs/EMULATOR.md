@@ -13,10 +13,10 @@ normally stream.
 | Settings UI, layout at Karoo screen size | yes | yes |
 | Overlay: touch swallowing, hold-to-unlock, reason label | yes | yes |
 | Lock state machine (all triggers, debounce, auto-unlock) | yes, via simulator | yes |
-| Unit tests for `LockReducer` | yes (`./gradlew testDebugUnitTest`) | n/a |
+| Unit tests for `LockReducer` and `OpenMeteoRain` | yes (`./gradlew testDebugUnitTest`) | n/a |
 | `KarooSystemService` connection, real ride/sensor streams | no | yes |
 | Hardware buttons / bonus action binding | simulated only | yes |
-| karoo-headwind precipitation stream | simulated only | yes |
+| Rain lookups (Open-Meteo over HTTP, or headwind's stream) | simulated only | yes |
 | Rendering under the actual Karoo launcher | no | yes |
 
 The state machine, the overlay, and the settings plumbing are the parts that carry the
@@ -121,9 +121,13 @@ background, open SmartLock on the emulator first.
   the button routing.
 - **Density and touch targets.** Sizes are close, not exact, until you confirm the real
   density on a device.
-- **karoo-headwind.** The cross-extension precipitation stream
-  (`TYPE_EXT::karoo-headwind::precipitation`) needs the real system; the simulator's rain
-  buttons inject the decoded result instead.
+- **Rain.** Neither source works off-device. `OpenMeteoRainSource` needs karoo-ext's HTTP
+  bridge and a Karoo location fix, and the headwind source needs the cross-extension
+  stream (`TYPE_EXT::karoo-headwind::precipitation`) — so the simulator's rain buttons
+  inject the decoded `RainStatus` instead, which is the only input the reducer sees
+  anyway. Because no fix ever arrives, the Open-Meteo poller stays silent and will not
+  overwrite what you inject. The request URL and the response classification are pure
+  Kotlin and covered by `OpenMeteoRainTest`.
 
 Sanity-check on the bike before shipping — but the emulator loop is where the trigger
 logic should be debugged.

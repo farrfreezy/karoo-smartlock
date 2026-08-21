@@ -5,8 +5,10 @@ import kotlinx.coroutines.flow.Flow
 
 /**
  * Abstraction over where rain information comes from, so the source can be
- * swapped (karoo-headwind stream today, direct Open-Meteo via karoo-ext HTTP
- * later) without touching the lock controller.
+ * swapped without touching the lock controller.
+ *
+ * @see OpenMeteoRainSource fetched directly over karoo-ext's HTTP bridge (default)
+ * @see HeadwindRainSource read from the karoo-headwind extension's stream
  */
 interface RainSource {
     fun observeRain(): Flow<RainStatus>

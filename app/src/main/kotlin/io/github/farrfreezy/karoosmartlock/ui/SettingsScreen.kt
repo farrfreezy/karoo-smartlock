@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.farrfreezy.karoosmartlock.BuildConfig
+import io.github.farrfreezy.karoosmartlock.core.RainDataSource
 import io.github.farrfreezy.karoosmartlock.core.SmartLockSettings
 import io.github.farrfreezy.karoosmartlock.core.TempMode
 import io.github.farrfreezy.karoosmartlock.core.ThresholdTrigger
@@ -183,10 +184,14 @@ fun SettingsScreen(
             item {
                 SwitchCard(
                     title = "Lock when raining",
-                    subtitle = "Requires the karoo-headwind extension for precipitation data",
+                    subtitle = "Needs a network connection during the ride — wifi, " +
+                        "or Bluetooth to the Companion app",
                     checked = settings.rainEnabled,
                     onToggle = { on -> update { it.copy(rainEnabled = on) } },
                 )
+            }
+            if (settings.rainEnabled) {
+                item { RainSourceCard(settings = settings, update = update) }
             }
 
             item { SectionHeader("Unlock behavior") }
@@ -372,6 +377,48 @@ private fun androidx.compose.foundation.layout.RowScope.ModeChip(
         Button(onClick = onClick, modifier = Modifier.weight(1f)) { Text(label) }
     } else {
         OutlinedButton(onClick = onClick, modifier = Modifier.weight(1f)) { Text(label) }
+    }
+}
+
+@Composable
+private fun RainSourceCard(
+    settings: SmartLockSettings,
+    update: ((SmartLockSettings) -> SmartLockSettings) -> Unit,
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                RadioButton(
+                    selected = settings.rainSource == RainDataSource.OPEN_METEO,
+                    onClick = { update { it.copy(rainSource = RainDataSource.OPEN_METEO) } },
+                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Open-Meteo (built in)")
+                    Text(
+                        "Fetched by SmartLock, nothing else to install",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                RadioButton(
+                    selected = settings.rainSource == RainDataSource.HEADWIND,
+                    onClick = { update { it.copy(rainSource = RainDataSource.HEADWIND) } },
+                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("karoo-headwind")
+                    Text(
+                        "Reuses that extension's weather, no extra requests",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
+            Text(
+                text = "Weather data by open-meteo.com (CC BY 4.0)",
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
     }
 }
 
