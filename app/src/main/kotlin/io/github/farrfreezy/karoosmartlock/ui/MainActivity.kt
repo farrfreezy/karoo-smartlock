@@ -9,8 +9,10 @@ import androidx.activity.compose.setContent
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import io.github.farrfreezy.karoosmartlock.BuildConfig
 import io.github.farrfreezy.karoosmartlock.KarooSmartLockExtension
 import io.github.farrfreezy.karoosmartlock.data.SettingsRepository
+import io.github.farrfreezy.karoosmartlock.sim.SimulatorClient
 import io.hammerhead.karooext.KarooSystemService
 import io.hammerhead.karooext.models.UserProfile
 
@@ -18,6 +20,7 @@ class MainActivity : ComponentActivity() {
 
     private val karoo by lazy { KarooSystemService(this) }
     private val repository by lazy { SettingsRepository(this) }
+    private val simulator by lazy { if (BuildConfig.DEBUG) SimulatorClient(this) else null }
 
     private var karooConnected by mutableStateOf(false)
     private var profile by mutableStateOf<UserProfile?>(null)
@@ -38,6 +41,7 @@ class MainActivity : ComponentActivity() {
                     profile = profile,
                     onRequestOverlayPermission = ::requestOverlayPermission,
                     onPreviewLock = ::previewLock,
+                    simulator = simulator,
                 )
             }
         }

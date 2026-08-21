@@ -78,6 +78,20 @@ Releases are signed with a keystore provided via repository secrets
 release falls back to a debug signature, which installs fine but won't produce a stable
 update signature — set the secrets before distributing.
 
+## Testing without a Karoo (emulator)
+
+There is no public Karoo system image, so the device itself can't be emulated — but a
+Karoo-shaped Android emulator plus the debug-build simulator covers the settings UI, the
+overlay, and the whole trigger state machine on a Mac or Linux box:
+
+```bash
+tools/karoo-avd.sh create && tools/karoo-avd.sh start
+./gradlew app:installDebug
+tools/karoo-sim.sh ride recording
+```
+
+See [docs/EMULATOR.md](docs/EMULATOR.md) for the full loop and what it can't tell you.
+
 ## Testing on your Karoo
 
 1. Sideload a debug build (`./gradlew app:installDebug` over ADB works too) and enable

@@ -14,6 +14,7 @@ import io.github.farrfreezy.karoosmartlock.karoo.streamDataFlow
 import io.github.farrfreezy.karoosmartlock.karoo.streamRideState
 import io.github.farrfreezy.karoosmartlock.karoo.toRide
 import io.github.farrfreezy.karoosmartlock.overlay.LockOverlayManager
+import io.github.farrfreezy.karoosmartlock.sim.SimulatorBridge
 import io.github.farrfreezy.karoosmartlock.weather.HeadwindRainSource
 import io.hammerhead.karooext.KarooSystemService
 import io.hammerhead.karooext.extension.KarooExtension
@@ -107,8 +108,29 @@ class KarooSmartLockExtension : KarooExtension("karoo-smartlock", BuildConfig.VE
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_PREVIEW_LOCK) startPreview()
+        when (intent?.action) {
+            ACTION_PREVIEW_LOCK -> startPreview()
+            // Debug-only: lets the emulator drive the state machine with no Karoo attached.
+            SimulatorBridge.ACTION_SIM -> if (BuildConfig.DEBUG) handleSimulatedEvent(intent)
+        }
         return super.onStartCommand(intent, flags, startId)
+    }
+
+    private fun handleSimulatedEvent(intent: Intent?) {
+        if (intent == null) return
+        val event = SimulatorBridge.eventFor(
+            kind = intent.getStringExtra(SimulatorBridge.EXTRA_KIND),
+            arg = intent.getStringExtra(SimulatorBridge.EXTRA_ARG),
+            value = intent.getStringExtra(SimulatorBridge.EXTRA_VALUE),
+        ) ?: return
+        scope.launch {
+            previewJob?.cancel()
+            previewJob = null
+            controller.onEvent(event)
+            // commands is distinctUntilChanged, so nudge the overlay for events that
+            // land on the same command (e.g. a lock reason change, or preview cleanup).
+            syncOverlay()
+        }
     }
 
     override fun onBonusAction(actionId: String) {
