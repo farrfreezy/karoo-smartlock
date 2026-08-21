@@ -4,18 +4,23 @@ import android.content.Intent
 import io.github.farrfreezy.karoosmartlock.core.LockCommand
 import io.github.farrfreezy.karoosmartlock.core.LockController
 import io.github.farrfreezy.karoosmartlock.core.LockEvent
+import io.github.farrfreezy.karoosmartlock.core.RainDataSource
 import io.github.farrfreezy.karoosmartlock.core.RainStatus
+import io.github.farrfreezy.karoosmartlock.core.Ride
 import io.github.farrfreezy.karoosmartlock.core.Sensor
 import io.github.farrfreezy.karoosmartlock.core.SmartLockSettings
 import io.github.farrfreezy.karoosmartlock.core.TempMode
 import io.github.farrfreezy.karoosmartlock.data.SettingsRepository
 import io.github.farrfreezy.karoosmartlock.karoo.singleValueOrNull
 import io.github.farrfreezy.karoosmartlock.karoo.streamDataFlow
+import io.github.farrfreezy.karoosmartlock.karoo.streamLocation
 import io.github.farrfreezy.karoosmartlock.karoo.streamRideState
 import io.github.farrfreezy.karoosmartlock.karoo.toRide
 import io.github.farrfreezy.karoosmartlock.overlay.LockOverlayManager
 import io.github.farrfreezy.karoosmartlock.sim.SimulatorBridge
 import io.github.farrfreezy.karoosmartlock.weather.HeadwindRainSource
+import io.github.farrfreezy.karoosmartlock.weather.OpenMeteoRainSource
+import io.github.farrfreezy.karoosmartlock.weather.RainSource
 import io.hammerhead.karooext.KarooSystemService
 import io.hammerhead.karooext.extension.KarooExtension
 import io.hammerhead.karooext.models.DataType
@@ -26,7 +31,9 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -39,6 +46,9 @@ class KarooSmartLockExtension : KarooExtension("karoo-smartlock", BuildConfig.VE
     private lateinit var overlay: LockOverlayManager
     private lateinit var settingsRepository: SettingsRepository
     private var previewJob: Job? = null
+
+    /** Weather is only polled during a ride; the reducer ignores it otherwise. */
+    private val rideActive = MutableStateFlow(false)
 
     override fun onCreate() {
         super.onCreate()
@@ -63,7 +73,9 @@ class KarooSmartLockExtension : KarooExtension("karoo-smartlock", BuildConfig.VE
 
         scope.launch {
             karoo.streamRideState().collect { rideState ->
-                controller.onEvent(LockEvent.RideStateChanged(rideState.toRide()))
+                val ride = rideState.toRide()
+                rideActive.value = ride != Ride.Idle
+                controller.onEvent(LockEvent.RideStateChanged(ride))
             }
         }
 
@@ -88,16 +100,18 @@ class KarooSmartLockExtension : KarooExtension("karoo-smartlock", BuildConfig.VE
         }
 
         scope.launch {
-            settingsRepository.settingsFlow
-                .map { it.rainEnabled }
+            combine(settingsRepository.settingsFlow, rideActive) { settings, riding ->
+                if (settings.rainEnabled && riding) settings.rainSource else null
+            }
                 .distinctUntilChanged()
-                .collectLatest { enabled ->
-                    if (enabled) {
-                        HeadwindRainSource(karoo).observeRain().collect {
-                            controller.onEvent(LockEvent.RainUpdate(it))
+                .collectLatest { source ->
+                    // Start from "no reading" on every switch: a source reports only
+                    // what it actually knows, so a stale status must not carry over.
+                    controller.onEvent(LockEvent.RainUpdate(RainStatus.Unknown))
+                    source?.let {
+                        rainSource(it).observeRain().collect { status ->
+                            controller.onEvent(LockEvent.RainUpdate(status))
                         }
-                    } else {
-                        controller.onEvent(LockEvent.RainUpdate(RainStatus.Unknown))
                     }
                 }
         }
@@ -164,6 +178,11 @@ class KarooSmartLockExtension : KarooExtension("karoo-smartlock", BuildConfig.VE
             previewJob = null
             syncOverlay()
         }
+    }
+
+    private fun rainSource(source: RainDataSource): RainSource = when (source) {
+        RainDataSource.OPEN_METEO -> OpenMeteoRainSource(karoo, karoo.streamLocation())
+        RainDataSource.HEADWIND -> HeadwindRainSource(karoo)
     }
 
     private fun neededSensors(settings: SmartLockSettings): Set<Sensor> = buildSet {

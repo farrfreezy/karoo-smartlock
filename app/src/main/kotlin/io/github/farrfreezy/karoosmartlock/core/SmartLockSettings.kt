@@ -20,6 +20,16 @@ enum class TempMode { OFF, ABOVE, BELOW, OUTSIDE_RANGE }
 @Serializable
 enum class UnlockMode { AUTO, MANUAL_ONLY }
 
+/**
+ * Where precipitation readings come from.
+ *
+ * [OPEN_METEO] fetches directly over karoo-ext's HTTP bridge and needs nothing
+ * installed; [HEADWIND] reuses the karoo-headwind extension's `precipitation`
+ * stream, which costs no extra requests for riders who already run it.
+ */
+@Serializable
+enum class RainDataSource { OPEN_METEO, HEADWIND }
+
 @Serializable
 data class SmartLockSettings(
     // One-shot triggers relative to ride start
@@ -32,6 +42,7 @@ data class SmartLockSettings(
     val unlockWhilePaused: Boolean = true,
     // Condition triggers over live sensor values
     val rainEnabled: Boolean = false,
+    val rainSource: RainDataSource = RainDataSource.OPEN_METEO,
     val hrAboveBpm: ThresholdTrigger = ThresholdTrigger(value = 160.0),
     val cadenceAboveRpm: ThresholdTrigger = ThresholdTrigger(value = 90.0),
     val powerAboveW: ThresholdTrigger = ThresholdTrigger(value = 250.0),

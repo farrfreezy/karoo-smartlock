@@ -16,6 +16,8 @@ class SmartLockSettingsSerializationTest {
     fun `round trip preserves settings`() {
         val settings = SmartLockSettings(
             timeAfterStartSec = ThresholdTrigger(true, 90.0),
+            rainEnabled = true,
+            rainSource = RainDataSource.HEADWIND,
             tempMode = TempMode.OUTSIDE_RANGE,
             unlockMode = UnlockMode.MANUAL_ONLY,
         )
