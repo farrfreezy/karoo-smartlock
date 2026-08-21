@@ -24,10 +24,12 @@ Each trigger can be enabled independently with its own threshold:
 - **Power above** a configurable wattage
 - **Temperature** as recorded by the device sensor — lock above a hot threshold, below a
   cold threshold (winter gloves), or outside either bound
-- **Rain** — locks when it starts raining at your current position, using
-  [Open-Meteo](https://open-meteo.com) fetched by SmartLock itself (no other extension
-  needed). Optionally reads [karoo-headwind](https://github.com/timklge/karoo-headwind)'s
-  precipitation stream instead, if you already run it — see [Rain detection](#rain-detection).
+- **Rain** — locks when it starts raining, using [Open-Meteo](https://open-meteo.com)
+  fetched by SmartLock itself (no other extension needed). Can lock a configurable time
+  *before* rain reaches you, and can lock for the whole ride when rain is likely along
+  your route. Optionally reads
+  [karoo-headwind](https://github.com/timklge/karoo-headwind)'s precipitation stream
+  instead, if you already run it — see [Rain detection](#rain-detection).
 
 Unlock behavior is selectable: **auto-unlock** when the condition clears (with a
 configurable hold delay to avoid flapping) or **stay locked** until manually unlocked.
@@ -55,12 +57,36 @@ genuine 15-minute output. Elsewhere, the UK included, those buckets are derived 
 hourly values, so treat a UK reading as hourly data that tracks the hour ahead rather
 than the hour behind — not as 15 minutes of real resolution.
 
-Requests go over karoo-ext's HTTP bridge, which uses wifi when connected and
-otherwise Bluetooth to the Hammerhead Companion app — so **rain detection needs your
-phone in range during the ride**. SmartLock polls only while a ride is recording,
-roughly every 10 minutes plus an extra lookup after 3 km of travel. When a request
-fails, or a reading goes more than 45 minutes stale, the trigger reports "unknown"
-and simply stays inert rather than asserting that it is dry.
+### Using your route
+
+When a route is loaded, SmartLock asks about the places you are *heading*, not just
+where you are: it samples up to 10 points along the road ahead, about an hour of riding
+apart, and fetches them in one request. Two things fall out of that.
+
+**Rain detection keeps working when your phone doesn't.** Requests go over karoo-ext's
+HTTP bridge — wifi when connected, otherwise Bluetooth to the Hammerhead Companion app.
+Because SmartLock caches a *forecast* rather than an observation, it answers from that
+cache every 15 seconds and one successful fetch covers you long after the phone drops
+out of range. Without a route it still forecasts forward, just blind to the fact that
+you are moving.
+
+**Lock before the rain hits.** *Lock before rain arrives* takes a lead time; SmartLock
+walks forward from now to the end of that lead, advancing your position at your current
+speed, and locks if you ride into rain in that window. Set it to `Off` to lock only
+once rain is actually falling on you.
+
+**Lock the whole ride if rain is likely.** Set a chance-of-rain threshold (default 65%)
+and SmartLock takes the highest hourly probability forecast for any point along your
+route, matched to the hour you are expected to reach it. Cross the threshold once and
+the screen stays locked for the rest of the ride, regardless of unlock mode — hold the
+padlock to override it. With no route loaded this falls back to the chance of rain
+around your current position over the next hour or so.
+
+SmartLock polls only while a ride is recording, roughly every 10 minutes plus an extra
+lookup after 3 km. Multi-point requests are weighted per location, so a full route
+lookup costs about as much of Open-Meteo's quota as 10 single requests — still far under
+the free tier's 5,000/hour. When a request fails, or a forecast goes more than 3 hours
+old, the trigger reports "unknown" and stays inert rather than asserting that it is dry.
 
 Riders who already run karoo-headwind can point the trigger at its `precipitation`
 stream instead (Settings → Weather), which costs no extra requests. Note that
@@ -145,8 +171,10 @@ See [docs/EMULATOR.md](docs/EMULATOR.md) for the full loop and what it can't tel
 ## Architecture notes
 
 - `core/` is pure Kotlin (no Android imports): `LockReducer` is a pure state machine
-  with injected time, and `OpenMeteoRain` builds the weather request and classifies the
-  response. Both are fully covered by unit tests (`app/src/test/`).
+  with injected time; `OpenMeteoRain`/`RainForecast` build the weather request and turn
+  the response into a lock decision; `RoutePath`/`Polyline` decode the route geometry
+  (no Mapbox dependency — all we need is "where am I at distance N"). All are fully
+  covered by unit tests (`app/src/test/`).
 - The extension service (`KarooSmartLockExtension`) streams ride state and only the
   sensor data the enabled triggers need, feeds the reducer, and shows/hides the
   overlay from its commands.
